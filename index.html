@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Lamborghini Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #050505; font-family: sans-serif; touch-action: manipulation; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+
+        .top-right-bar {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .top-btn {
+            background: linear-gradient(45deg, #38bdf8, #0284c7);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 18px;
+            font-weight: bold;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        #shop-btn {
+            background: linear-gradient(45deg, #f59e0b, #d97706);
+        }
+
+        .modal {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 23, 42, 0.95);
+            color: #fff;
+            padding: 22px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #38bdf8;
+            z-index: 20;
+            width: 90%;
+            max-width: 420px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        #start-screen {
+            display: block;
+            border-color: #22c55e;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .shop-item {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .color-preview {
+            width: 50px;
+            height: 22px;
+            border-radius: 4px;
+            margin: 6px 0;
+            border: 1px solid #ffffff44;
+        }
+
+        .shop-item button {
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: none;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            background: #38bdf8;
+            color: #0f172a;
+            font-size: 12px;
+        }
+
+        .shop-item button:disabled {
+            background: #475569;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .btn-action {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            background: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            margin-top: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 25px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            color: white;
+            font-size: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            user-select: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="ui">
+        🚩 Level: <span id="level" style="color: #38bdf8;">1</span><br>
+        🎯 Score: <span id="score">0</span> / 200 | 🪙 Coins: <span id="coins">0</span>
+    </div>
+
+    <div class="top-right-bar">
+        <button class="top-btn" id="restart-top-btn" onclick="resetGame()">🔄 Restart</button>
+        <button class="top-btn" id="shop-btn" onclick="toggleShop(true)">🏪 Garage</button>
+    </div>
+
+    <!-- Start Screen Modal -->
+    <div id="start-screen" class="modal">
+        <h1 style="color: #22c55e; font-size: 28px;">3D LAMBORGHINI</h1>
+        <p style="color: #cbd5e1; margin-top: 8px;">Traffic theke baanchun ebong coin collect korun!</p>
+        <button class="btn-action" onclick="startGame()">▶️ START GAME</button>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over" class="modal" style="border-color: #ef4444;">
+        <h1 style="color: #ef4444; font-size: 26px;">CRASHED!</h1>
+        <p style="color: #cbd5e1; margin-top: 8px;">Lamborghini Accident!</p>
+        <button class="btn-action" style="background: #ef4444;" onclick="resetGame()">🔄 RESTART GAME</button>
+    </div>
+
+    <!-- Level Complete Modal -->
+    <div id="level-complete" class="modal">
+        <h1 style="color: #22c55e; font-size: 26px;">LEVEL COMPLETE! 🎉</h1>
+        <p style="color: #cbd5e1; margin-top: 8px;">Poror level-e jawar jonyo prostut!</p>
+        <button class="btn-action" onclick="nextLevel()">Next Level ➡️</button>
+    </div>
+
+    <!-- Store Modal -->
+    <div id="shop" class="modal">
+        <h2 style="color: #f59e0b;">🏎️ Garage (50 Skins)</h2>
+        <p style="margin-top: 4px; color: #94a3b8; font-size: 13px;">Coins: <span id="shop-coins" style="color: #facc15;">0</span> 🪙</p>
+        <div class="shop-grid" id="shop-container"></div>
+        <button class="btn-action" style="background: #475569;" onclick="toggleShop(false)">Close</button>
+    </div>
+
+    <div id="controls">
+        <div class="btn" id="left-btn">⬅️</div>
+        <div class="btn" id="right-btn">➡️</div>
+    </div>
+
+    <script>
+        let scene, camera, renderer;
+        let car, road;
+        let playerWheels = [];
+        let enemyWheelsList = [];
+        let buildings = [];
+        let lightPosts = [];
+        let clouds = [];
+        let coinsList = [];
+        let enemyCars = [];
+        let isGameOver = false;
+        let isGameStarted = false;
+        let isPaused = false;
+
+        const roadWidth = 9;
+        const laneX = [-2.8, 0, 2.8];
+        let currentLane = 1;
+        let baseSpeed = 0.65;
+        let speed = baseSpeed;
+        let score = 0;
+        let levelTargetScore = 200;
+
+        let coins = parseInt(localStorage.getItem("3d_lambo_coins")) || 0;
+        let currentLevel = parseInt(localStorage.getItem("3d_lambo_level")) || 1;
+        let unlockedSkins = JSON.parse(localStorage.getItem("3d_lambo_skins")) || [0];
+        let currentSkinIndex = parseInt(localStorage.getItem("3d_lambo_currentSkinIndex")) || 0;
+
+        function saveData() {
+            localStorage.setItem("3d_lambo_coins", coins);
+            localStorage.setItem("3d_lambo_level", currentLevel);
+            localStorage.setItem("3d_lambo_skins", JSON.stringify(unlockedSkins));
+            localStorage.setItem("3d_lambo_currentSkinIndex", currentSkinIndex);
+        }
+
+        document.getElementById("coins").innerText = coins;
+        document.getElementById("level").innerText = currentLevel;
+
+        const skinsList = [];
+        const baseColors = [0xd92b2b, 0x06b6d4, 0x22c55e, 0xeab308, 0xa855f7, 0xec4899, 0xf97316, 0x1e293b, 0xf8fafc, 0x84cc16];
+        for (let i = 0; i < 50; i++) {
+            const color = baseColors[i % baseColors.length] + (i * 0x010203);
+            skinsList.push({
+                name: `Lambo Skin Lv.${i + 1}`,
+                color: color & 0xffffff,
+                price: (i + 1) * 15
+            });
+        }
+
+        function createBuildingTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, 128, 256);
+            for (let y = 10; y < 240; y += 20) {
+                for (let x = 10; x < 110; x += 25) {
+                    ctx.fillStyle = Math.random() > 0.4 ? (Math.random() > 0.5 ? '#fef08a' : '#38bdf8') : '#0f172a';
+                    ctx.fillRect(x, y, 15, 12);
+                }
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1, 2);
+            return texture;
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xb5d6fd);
+            scene.fog = new THREE.Fog(0xb5d6fd, 40, 150);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 3.8, 6.5);
+            camera.lookAt(0, 1, -12);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            dirLight.position.set(20, 40, 20);
+            scene.add(dirLight);
+
+            const sun = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 32), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+            sun.position.set(18, 22, -100);
+            scene.add(sun);
+
+            for (let i = 0; i < 12; i++) spawnCloud(Math.random() * -250);
+
+            const grass = new THREE.Mesh(new THREE.PlaneGeometry(200, 400), new THREE.MeshBasicMaterial({ color: 0x86efac }));
+            grass.rotation.x = -Math.PI / 2; grass.position.z = -100;
+            scene.add(grass);
+
+            road = new THREE.Mesh(new THREE.PlaneGeometry(roadWidth, 400), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            road.rotation.x = -Math.PI / 2; road.position.z = -100;
+            scene.add(road);
+
+            const line = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 400), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+            line.rotation.x = -Math.PI / 2; line.position.set(0, 0.01, -100);
+            scene.add(line);
+
+            createPlayerCar();
+
+            const buildingTexture = createBuildingTexture();
+            for (let z = 0; z > -250; z -= 20) {
+                spawnBuilding(z, buildingTexture);
+                spawnLightPost(z);
+            }
+
+            for (let z = -30; z > -250; z -= 30) {
+                spawnCoin(z);
+                spawnEnemy(z - 15);
+            }
+
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') moveLeft();
+                if (e.key === 'ArrowRight') moveRight();
+            });
+
+            document.getElementById('left-btn').addEventListener('click', moveLeft);
+            document.getElementById('right-btn').addEventListener('click', moveRight);
+
+            renderer.render(scene, camera);
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            isGameStarted = true;
+            isGameOver = false;
+            animate();
+        }
+
+        function createLamborghiniModel(colorHex) {
+            const lamboGroup = new THREE.Group();
+            const mainMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.2 });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x020617 });
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 3.2), mainMat);
+            body.position.y = 0.35;
+            lamboGroup.add(body);
+
+            const hood = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 1.1), mainMat);
+            hood.position.set(0, 0.42, -0.9);
+            hood.rotation.x = 0.15;
+            lamboGroup.add(hood);
+
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.35, 1.3), glassMat);
+            cabin.position.set(0, 0.65, -0.1);
+            cabin.rotation.x = -0.1;
+            lamboGroup.add(cabin);
+
+            const spoilerWing = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.3), mainMat);
+            spoilerWing.position.set(0, 0.7, 1.3);
+            lamboGroup.add(spoilerWing);
+
+            return lamboGroup;
+        }
+
+        function createWheel() {
+            const wheel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a })
+            );
+            wheel.rotation.z = Math.PI / 2;
+            return wheel;
+        }
+
+        function createPlayerCar() {
+            if (car) scene.remove(car);
+            const skinData = skinsList[currentSkinIndex];
+            car = createLamborghiniModel(skinData.color);
+            playerWheels = [];
+
+            const positions = [
+                [-0.85, 0.3, 0.9], [0.85, 0.3, 0.9],
+                [-0.85, 0.3, -0.9], [0.85, 0.3, -0.9]
+            ];
+            positions.forEach(pos => {
+                const w = createWheel();
+                w.position.set(...pos);
+                car.add(w);
+                playerWheels.push(w);
+            });
+
+            car.position.set(laneX[currentLane], 0, 0);
+            scene.add(car);
+        }
+
+        function spawnBuilding(zPos, texture) {
+            const h = Math.random() * 12 + 10;
+            const bMat = new THREE.MeshStandardMaterial({ map: texture });
+
+            const leftB = new THREE.Mesh(new THREE.BoxGeometry(7, h, 10), bMat);
+            leftB.position.set(-8.5, h / 2, zPos);
+            scene.add(leftB); buildings.push(leftB);
+
+            const rightB = new THREE.Mesh(new THREE.BoxGeometry(7, h, 10), bMat);
+            rightB.position.set(8.5, h / 2, zPos);
+            scene.add(rightB); buildings.push(rightB);
+        }
+
+        function spawnLightPost(zPos) {
+            const post = new THREE.Group();
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.5), new THREE.MeshBasicMaterial({ color: 0x475569 }));
+            pole.position.y = 2.25; post.add(pole);
+
+            const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.2), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+            lamp.position.set(-0.2, 4.4, 0); post.add(lamp);
+
+            post.position.set(-4.8, 0, zPos);
+            scene.add(post); lightPosts.push(post);
+        }
+
+        function spawnCloud(zPos) {
+            const cloud = new THREE.Group();
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+            for (let i = 0; i < 3; i++) {
+                const part = new THREE.Mesh(new THREE.SphereGeometry(2, 8, 8), mat);
+                part.position.set(i * 1.5, Math.random() * 0.5, 0);
+                cloud.add(part);
+            }
+            const side = Math.random() > 0.5 ? 1 : -1;
+            cloud.position.set((20 + Math.random() * 10) * side, 16 + Math.random() * 4, zPos);
+            scene.add(cloud); clouds.push(cloud);
+        }
+
+        function spawnCoin(zPos) {
+            const lane = Math.floor(Math.random() * 3);
+            const coin = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.45, 0.45, 0.15, 12),
+                new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.8 })
+            );
+            coin.rotation.x = Math.PI / 2;
+            coin.position.set(laneX[lane], 0.7, zPos);
+            scene.add(coin); coinsList.push(coin);
+        }
+
+        function spawnEnemy(zPos) {
+            const lane = Math.floor(Math.random() * 3);
+            const enemyColors = [0x0284c7, 0xf97316, 0x16a34a, 0xa855f7, 0xef4444];
+            const randColor = enemyColors[Math.floor(Math.random() * enemyColors.length)];
+
+            const enemy = createLamborghiniModel(randColor);
+            enemy.position.set(laneX[lane], 0, zPos);
+            scene.add(enemy); enemyCars.push(enemy);
+        }
+
+        function moveLeft() { if (currentLane > 0 && !isGameOver && !isPaused && isGameStarted) currentLane--; }
+        function moveRight() { if (currentLane < 2 && !isGameOver && !isPaused && isGameStarted) currentLane++; }
+
+        function toggleShop(show) {
+            isPaused = show;
+            document.getElementById("shop-coins").innerText = coins;
+            document.getElementById("shop").style.display = show ? "block" : "none";
+            if (show) renderShopItems();
+        }
+
+        function renderShopItems() {
+            const container = document.getElementById("shop-container");
+            container.innerHTML = "";
+
+            skinsList.forEach((skin, index) => {
+                const isUnlocked = unlockedSkins.includes(index);
+                const isSelected = currentSkinIndex === index;
+                const hexColor = "#" + skin.color.toString(16).padStart(6, '0');
+
+                let btnHtml = "";
+                if (isSelected) {
+                    btnHtml = `<button disabled style="background:#22c55e; color:#fff;">Active</button>`;
+                } else if (isUnlocked) {
+                    btnHtml = `<button onclick="selectSkin(${index})">Select</button>`;
+                } else {
+                    btnHtml = `<button onclick="buySkin(${index}, ${skin.price})">${skin.price} 🪙</button>`;
+                }
+
+                container.innerHTML += `
+                    <div class="shop-item">
+                        <div style="font-size: 11px; font-weight: bold; color: #f8fafc;">${skin.name}</div>
+                        <div class="color-preview" style="background: ${hexColor}"></div>
+                        ${btnHtml}
+                    </div>
+                `;
+            });
+        }
+
+        function buySkin(index, price) {
+            if (coins >= price) {
+                coins -= price; unlockedSkins.push(index); currentSkinIndex = index;
+                createPlayerCar(); saveData();
+                document.getElementById("coins").innerText = coins;
+                renderShopItems();
+            } else { alert("Insufficient Coins!"); }
+        }
+
+        function selectSkin(index) {
+            currentSkinIndex = index; createPlayerCar(); saveData(); renderShopItems();
+        }
+
+        function resetGame() {
+            isGameOver = false; score = 0; currentLane = 1; speed = baseSpeed + (currentLevel * 0.02);
+            document.getElementById('score').innerText = score;
+            document.getElementById('game-over').style.display = 'none';
+
+            enemyCars.forEach(e => scene.remove(e));
+            coinsList.forEach(c => scene.remove(c));
+            enemyCars = []; coinsList = [];
+
+            for (let z = -30; z > -250; z -= 30) {
+                spawnCoin(z); spawnEnemy(z - 15);
+            }
+            if (isGameStarted) animate();
+        }
+
+        function nextLevel() {
+            currentLevel++; saveData();
+            document.getElementById("level").innerText = currentLevel;
+            document.getElementById('level-complete').style.display = 'none';
+            resetGame();
+        }
+
+        function animate() {
+            if (isGameOver || isPaused || !isGameStarted) return;
+            requestAnimationFrame(animate);
+
+            car.position.x += (laneX[currentLane] - car.position.x) * 0.2;
+            playerWheels.forEach(w => w.rotation.x += speed * 0.8);
+
+            clouds.forEach(cl => {
+                cl.position.z += speed * 0.2;
+                if (cl.position.z > 10) cl.position.z = -240;
+            });
+
+            buildings.forEach(b => {
+                b.position.z += speed;
+                if (b.position.z > 10) b.position.z = -240;
+            });
+
+            lightPosts.forEach(lp => {
+                lp.position.z += speed;
+                if (lp.position.z > 10) lp.position.z = -240;
+            });
+
+            coinsList.forEach((c, index) => {
+                c.position.z += speed;
+                c.rotation.z += 0.05;
+
+                if (Math.abs(c.position.z - car.position.z) < 1.2 && Math.abs(c.position.x - car.position.x) < 1.0) {
+                    scene.remove(c); coinsList.splice(index, 1);
+                    coins += 2; score += 20;
+                    document.getElementById('coins').innerText = coins;
+                    document.getElementById('score').innerText = score;
+                    saveData();
+                    spawnCoin(-240);
+
+                    if (score >= levelTargetScore) {
+                        isGameOver = true;
+                        document.getElementById('level-complete').style.display = 'block';
+                    }
+                }
+
+                if (c.position.z > 10) {
+                    c.position.z = -240;
+                    c.position.x = laneX[Math.floor(Math.random() * 3)];
+                }
+            });
+
+            enemyCars.forEach((enemy) => {
+                enemy.position.z += speed * 0.65;
+
+                if (Math.abs(enemy.position.z - car.position.z) < 2.2 && Math.abs(enemy.position.x - car.position.x) < 1.2) {
+                    isGameOver = true;
+                    saveData();
+                    document.getElementById('game-over').style.display = 'block';
+                }
+
+                if (enemy.position.z > 10) {
+                    enemy.position.z = -240;
+                    enemy.position.x = laneX[Math.floor(Math.random() * 3)];
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>
