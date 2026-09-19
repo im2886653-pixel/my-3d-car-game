@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Car Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background-color: #000; }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            z-index: 10;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 15px;
+            border-radius: 8px;
+        }
+        #skinSelect {
+            margin-top: 5px;
+            padding: 5px;
+            border-radius: 4px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #555;
+        }
+    </style>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="ui">
+        <h2>3D Car Game</h2>
+        <label for="skinSelect">Skin সিলেক্ট করুন (১০০টি স্কিন):</label><br>
+        <select id="skinSelect"></select>
+        <p>কন্ট্রোল: <b>W, A, S, D</b> অথবা <b>Arrow Keys</b></p>
+    </div>
+
+    <script>
+        // ১. সিন ও ক্যামেরা তৈরি
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // ২. লাইটিং (আলো ও শ্যাডো)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(20, 40, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // ৩. রাস্তা/মাঠ তৈরি
+        const planeGeo = new THREE.PlaneGeometry(200, 200);
+        const planeMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+        const ground = new THREE.Mesh(planeGeo, planeMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // ৪. ১০০টি বিভিন্ন কালার স্কিন জেনারেট করা
+        const skins = [];
+        const skinSelect = document.getElementById('skinSelect');
+
+        for (let i = 0; i < 100; i++) {
+            // কালার স্পেকট্রাম থেকে বিভিন্ন শেড জেনারেট করা
+            const hue = (i * 3.6) / 360; 
+            const color = new THREE.Color().setHSL(hue, 0.8, 0.5);
+            const hexColor = '#' + color.getHexString();
+            
+            skins.push(color);
+
+            const option = document.createElement('option');
+            option.value = i;
+            option.text = `Skin #${i + 1} (${hexColor})`;
+            skinSelect.appendChild(option);
+        }
+
+        // ৫. উন্নত টেক্সচারসহ গাড়ি তৈরি (3D Car Body & Wheels)
+        const carGroup = new THREE.Group();
+
+        // কার বডি (Metalness & Roughness দিয়ে টেক্সচার প্রপার্টি ঠিক করা)
+        const bodyGeo = new THREE.BoxGeometry(2, 0.8, 4);
+        const carMaterial = new THREE.MeshStandardMaterial({ 
+            color: skins[0], 
+            metalness: 0.6, 
+            roughness: 0.2 
+        });
+        const carBody = new THREE.Mesh(bodyGeo, carMaterial);
+        carBody.position.y = 0.6;
+        carBody.castShadow = true;
+        carGroup.add(carBody);
+
+        // কার ক্যাবিন (কাচ/গ্লাস)
+        const cabinGeo = new THREE.BoxGeometry(1.6, 0.6, 2);
+        const cabinMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1 });
+        const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+        cabin.position.set(0, 1.2, -0.2);
+        carGroup.add(cabin);
+
+        // চাকা তৈরি
+        const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+
+        const wheelPositions = [
+            [-1.1, 0.4, 1.2],
+            [1.1, 0.4, 1.2],
+            [-1.1, 0.4, -1.2],
+            [1.1, 0.4, -1.2]
+        ];
+
+        wheelPositions.forEach(pos => {
+            const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(...pos);
+            wheel.castShadow = true;
+            carGroup.add(wheel);
+        });
+
+        scene.add(carGroup);
+
+        // ৬. স্কিন পরিবর্তন করার লজিক
+        skinSelect.addEventListener('change', (e) => {
+            const index = e.target.value;
+            carMaterial.color.set(skins[index]);
+        });
+
+        // ৭. ড্রাইভিং ও কিবোর্ড কন্ট্রোল
+        const keys = {};
+        window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+        let speed = 0;
+        let angle = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // এক্সিলারেটর ও ব্রেক
+            if (keys['w'] || keys['arrowup']) speed = Math.min(speed + 0.005, 0.2);
+            else if (keys['s'] || keys['arrowdown']) speed = Math.max(speed - 0.005, -0.1);
+            else speed *= 0.95; // ফ্রিকশন/ঘর্ষণ
+
+            // স্ট্রিয়ারিং (ডানে/বামে)
+            if (keys['a'] || keys['arrowleft']) angle += 0.03;
+            if (keys['d'] || keys['arrowright']) angle -= 0.03;
+
+            // গাড়ির পজিশন আপডেট
+            carGroup.rotation.y = angle;
+            carGroup.position.x += Math.sin(angle) * speed;
+            carGroup.position.z += Math.cos(angle) * speed;
+
+            // ক্যামেরা ফলো অপশন
+            camera.position.x = carGroup.position.x - Math.sin(angle) * 8;
+            camera.position.z = carGroup.position.z - Math.cos(angle) * 8;
+            camera.position.y = carGroup.position.y + 4;
+            camera.lookAt(carGroup.position);
+
+            renderer.render(scene, camera);
+        }
+
+        // উইন্ডো রিসাইজ হ্যান্ডলার
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
